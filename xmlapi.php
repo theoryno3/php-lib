@@ -34,20 +34,21 @@ class CXML
 	private $xmlroot = '';
 	private $header = '';
 	
-	function __construct($dir,$file) 
+	function __construct($path,$file = null) 
 	{
-		if(strstr($file,".zip")) {
+		$filepath = $path.$file;
+		if(strstr($filepath,".zip")) {
 			$z = new ZipArchive();
-			if ($z->open($dir.$file) == FALSE) {
-				trigger_error("Unable to open $infile", E_USER_ERROR);
+			if ($z->open($filepath) == FALSE) {
+				trigger_error("Unable to open $filepath", E_USER_ERROR);
 				return FALSE;
 			}
-			$nozip = substr($file,0,strrpos($file,".zip"));
+			$nozip = substr($filepath,0,strrpos($filepath,".zip"));
 			$this->fp = $z->getStream($nozip);
 		} else {
-			$this->fp = gzopen($dir.$file,"r");
+			$this->fp = gzopen($filepath,"r");
 			if($this->fp === FALSE) {
-				trigger_error("unable to open $dir$file");
+				trigger_error("unable to open $filepath");
 				exit;
 			}
 		}
@@ -66,7 +67,6 @@ class CXML
 		while(($l = gzgets($this->fp, 80000)) !== FALSE) {
 			if($elementToParse == null) {$content .= $l; continue;}
 			else if($this->header == '') {$this->header = $l; continue;}
-		
 			$exception = false;
 			if( strstr($l,"<".$elementToParse.">") && strstr($l,"</".$elementToParse.">")) {
 				$exception = true;
@@ -75,6 +75,12 @@ class CXML
 				$body .= $l;
 
 				$this->xmlroot = simplexml_load_string($this->header.$body);
+				if($this->xmlroot === FALSE) {
+					trigger_error("Error in loading XML");
+					foreach(libxml_get_errors() as $error) {
+						echo "\t", $error->message;
+					}	
+				}
 				$body = ''; 
 				$parsing = false;
 				return TRUE;
@@ -82,7 +88,7 @@ class CXML
 				if($parsing == true) {
 					$body .= $l;
 				} else {
-					if(strstr($l,"<$elementToParse>") || strstr($l,"<$elementToParse ")) {
+					if(strstr($l,"<$elementToParse>") || strstr($l,"<$elementToParse ") || strstr($l,"<$elementToParse\n") || strstr($l,"<$elementToParse\r\n")) {
 						$parsing = true;
 						$body .= $l;
 					}
